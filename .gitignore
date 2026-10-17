@@ -1,0 +1,27 @@
+# Output directories and generated flashable packages
+out/
+*.zip
+*.img
+
+# User private configs and backups
+*.myphone.*
+*.private.*
+*.bak
+config.local.txt
+
+# Kernel module build intermediates
+.tmp_versions/
+*.o
+*.mod.c
+*.mod.o
+*.ko.cmd
+*.mod.o.cmd
+*.o.cmd
+modules.order
+Module.symvers
+
+# System & editor artifacts
+.DS_Store
+Thumbs.db
+*.swp
+*~
