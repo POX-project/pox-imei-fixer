@@ -72,6 +72,7 @@ Run these commands on the phone (Termux) or through ADB (`adb shell <command>`) 
   ```bash
   service call iphonesubinfo 3
   ```
+> **Note:** If IMEI is not readable or not working on the phone, check the IMEI printed on the back of the device or on the original phone box/label.
 - **Wi-Fi MAC (`wifi_mac`)**
   ```bash
   cat /sys/class/net/wlan0/address
