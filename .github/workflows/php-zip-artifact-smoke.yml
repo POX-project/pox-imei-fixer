@@ -1,0 +1,55 @@
+name: php-zip artifact smoke
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  smoke-and-artifact:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: openssl, zip
+
+      - name: Verify PHP extensions
+        shell: bash
+        run: |
+          php -m | grep -qi '^openssl$'
+          php -m | grep -qi '^zip$'
+
+      - name: Prepare base patch zip
+        shell: bash
+        run: |
+          php -r '$z=new ZipArchive();$z->open("data/patch.zip", ZipArchive::CREATE|ZipArchive::OVERWRITE);$z->addFromString("META-INF/com/google/android/update-binary","stub");$z->close();'
+
+      - name: Generate flashable zip
+        shell: bash
+        run: php bin/mtk_imei.php
+
+      - name: Verify output zip exists
+        shell: bash
+        run: |
+          test -f out/imei_repair-begonia.zip
+
+      - name: Upload platform artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pox-imei-fixer-${{ matrix.os }}
+          path: |
+            README.md
+            LICENSE
+            mtk_imei.sh
+            mtk_imei.cmd
+            bin/
+            data/

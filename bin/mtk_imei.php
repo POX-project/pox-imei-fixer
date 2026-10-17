@@ -79,6 +79,11 @@
 
   echo "MTK IMEI patcher by timjosten\n\n";
 
+  if(!extension_loaded('openssl'))
+    die("The PHP openssl extension is required.\n");
+  if(!extension_loaded('zip'))
+    die("The PHP zip extension is required (install php-zip or enable ZipArchive).\n");
+
   $config = file_get_contents('config.txt') or
     die("Cannot open config file.\n");
   $config = json_decode($config, true) or
