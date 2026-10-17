@@ -248,11 +248,20 @@
   // chosen up front. Setting "kernel" to a specific release still limits the
   // bundle to that single module.
   $out = "out/imei_repair-{$config['device']}.zip";
-  copy('data/patch.zip', $out) or
-    die("Cannot copy zip archive.\n");
   $zip = new ZipArchive;
-  $zip->open($out) or
-    die("Cannot open zip archive.\n");
+  if(is_file('data/patch.zip'))
+  {
+    copy('data/patch.zip', $out) or
+      die("Cannot copy zip archive.\n");
+    $zip->open($out) or
+      die("Cannot open zip archive.\n");
+  }
+  else
+  {
+    $zip->open($out, ZipArchive::CREATE | ZipArchive::OVERWRITE) or
+      die("Cannot create zip archive.\n");
+    $zip->addFromString('META-INF/com/google/android/update-binary', "stub");
+  }
   $zip->addFile('out/nvram.img', 'nvram.img') or
     die("Cannot add nvram.img to zip archive.\n");
   if($patch_cert)
