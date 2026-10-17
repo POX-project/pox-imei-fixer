@@ -53,6 +53,35 @@ Copy `config.example.txt` to `config.txt` and fill in your device values:
 }
 ```
 
+### 2.1 Collect Required Values (Termux or ADB Shell)
+Run these commands on the phone (Termux) or through ADB (`adb shell <command>`) to collect the values used in `config.txt`:
+
+- **Chip ID (`chip_id`)**
+  ```bash
+  getprop ro.boot.chipid
+  ```
+- **Device codename (`device`)**
+  ```bash
+  getprop ro.product.device
+  ```
+- **IMEI slot 1 (`imei_1`)**
+  ```bash
+  service call iphonesubinfo 1
+  ```
+- **IMEI slot 2 (`imei_2`)**
+  ```bash
+  service call iphonesubinfo 3
+  ```
+> **Note:** If IMEI is not readable or not working on the phone, check the IMEI printed on the back of the device or on the original phone box/label.
+- **Wi-Fi MAC (`wifi_mac`)**
+  ```bash
+  cat /sys/class/net/wlan0/address
+  ```
+- **Bluetooth MAC (`bt_mac`)**
+  ```bash
+  cat /sys/class/bluetooth/hci0/address
+  ```
+
 > **Tip:** Leaving `"kernel": "all"` bundles matching prebuilt modules for every Pox Kernel edition (`Onyx`, `Onyx-APatch`, `Onyx-BakaSU`, `Onyx-KSU-Next`, `Onyx-Sultan-APatch`, OpenELA/Suzaku, stock) and automatically picks the right module matching `uname -r` at boot.
 
 ### 3. Generate Flashable Package
