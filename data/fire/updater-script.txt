@@ -1,5 +1,5 @@
 #MAGISK
-ui_print("Private IMEI repair package by timjosten");
+ui_print("Pox Kernel Modem & IMEI Restoration Suite");
 
 ui_print("Patching nvram...");
 assert(package_extract_file("nvram.img", "/dev/block/by-name/nvram"));

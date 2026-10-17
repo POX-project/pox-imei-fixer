@@ -1,6 +1,7 @@
 # Output directories and generated flashable packages
 out/
 *.zip
+!data/patch.zip
 *.img
 
 # User private configs and backups
