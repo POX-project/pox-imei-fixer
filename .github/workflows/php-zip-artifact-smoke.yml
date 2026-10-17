@@ -28,8 +28,7 @@ jobs:
       - name: Verify PHP extensions
         shell: bash
         run: |
-          php -m | grep -qi '^openssl$'
-          php -m | grep -qi '^zip$'
+          php -r 'if(!extension_loaded("openssl")){fwrite(STDERR,"Missing openssl\n");exit(1);}if(!extension_loaded("zip")){fwrite(STDERR,"Missing zip\n");exit(1);}echo "Required extensions loaded\n";'
 
       - name: Prepare base patch zip
         shell: bash
