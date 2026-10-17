@@ -34,7 +34,7 @@ When flashing custom AOSP/LineageOS/HyperOS ROMs or custom kernels on Xiaomi Med
 ## Getting Started
 
 ### 1. Prerequisites
-- **Linux / macOS**: PHP 7.4+ or 8.x with `openssl` extension (`sudo apt install php-cli php-openssl`).
+- **Linux / macOS**: PHP 7.4+ or 8.x with `openssl` and `zip` extensions (`sudo apt install php-cli php-openssl php-zip`).
 - **Windows**: Built-in PHP binaries and DLLs are already bundled in the `bin/` directory.
 
 ### 2. Configuration
