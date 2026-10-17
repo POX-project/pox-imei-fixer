@@ -30,19 +30,41 @@ jobs:
         run: |
           php -r 'if(!extension_loaded("openssl")){fwrite(STDERR,"Missing openssl\n");exit(1);}if(!extension_loaded("zip")){fwrite(STDERR,"Missing zip\n");exit(1);}echo "Required extensions loaded\n";'
 
-      - name: Prepare base patch zip
+      - name: Verify base patch template
         shell: bash
         run: |
-          php -r '$z=new ZipArchive();$z->open("data/patch.zip", ZipArchive::CREATE|ZipArchive::OVERWRITE);$z->addFromString("META-INF/com/google/android/update-binary","stub");$z->close();'
+          if [ ! -f "data/patch.zip" ]; then
+            echo "data/patch.zip missing, creating fallback"
+            php -r '$z=new ZipArchive();$z->open("data/patch.zip", ZipArchive::CREATE|ZipArchive::OVERWRITE);$z->addFromString("META-INF/com/google/android/update-binary","stub");$z->close();'
+          else
+            echo "data/patch.zip verified ($(stat -c %s data/patch.zip 2>/dev/null || wc -c < data/patch.zip) bytes)"
+          fi
 
-      - name: Generate flashable zip
+      - name: Generate flashable zip (System PHP)
         shell: bash
         run: php bin/mtk_imei.php
 
-      - name: Verify output zip exists
+      - name: Verify output zips exist
         shell: bash
         run: |
+          test -f out/pox_imei_fixer-begonia.zip
           test -f out/imei_repair-begonia.zip
+
+      - name: Test Windows bundled php.exe
+        if: matrix.os == 'windows-latest'
+        shell: cmd
+        run: |
+          echo === Testing bundled Windows PHP version ===
+          bin\php.exe -v
+          echo === Testing bundled Windows PHP modules ===
+          bin\php.exe -d extension_dir=bin -c bin\php.ini -m
+          echo === Testing mtk_imei generation via bundled Windows PHP ===
+          bin\php.exe -d extension_dir=bin -c bin\php.ini bin\mtk_imei.php
+          if not exist out\pox_imei_fixer-begonia.zip (
+            echo [-] out\pox_imei_fixer-begonia.zip was not created!
+            exit /b 1
+          )
+          echo [+] Bundled Windows PHP test PASSED!
 
       - name: Upload platform artifact
         uses: actions/upload-artifact@v4
