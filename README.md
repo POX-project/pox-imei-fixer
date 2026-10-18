@@ -140,6 +140,15 @@ dd if=/sdcard/Pox_Backups/Modem_<TIMESTAMP>/nvdata.img of=/dev/block/by-name/nvd
 
 ---
 
+## VoLTE & Telephony Support (v3.1.0+)
+
+Modern custom ROMs (AOSP, Lineage, Axion, Android 13/14/15/16) and pure LTE networks (such as Airtel or Jio) require explicit VoLTE and IMS configuration. Version 3.1.0+ includes:
+- **Automatic VoLTE/IMS Property Injection (`system.prop`)**: Forces `persist.vendor.volte_support=1`, `persist.vendor.radio.volte_state=1`, and `persist.vendor.mtk.volte.enable=1` to prevent Telecom from unregistering the PhoneAccount.
+- **SELinux Context Restoration**: Applies `u:object_r:vendor_file:s0` to kernel modules and `u:object_r:system_file:s0` to helper binaries, avoiding AVC denials under SELinux Enforcing mode.
+- **Runtime NVDATA Permissions**: Automatically sets `/mnt/vendor/nvdata` ownership (`1000:1000`) and mode (`0771`) to ensure `nvram_daemon` operates without permissions errors.
+
+---
+
 ## Verification & Logs
 
 To verify that the modem patcher is active on boot:

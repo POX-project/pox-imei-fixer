@@ -303,6 +303,25 @@
     die("[-] FAILED: Cannot add nvram.img to zip archive.\n");
   echo "    [+] Injected calibrated nvram.img\n";
 
+  // Ensure VoLTE / IMS & Telephony properties are always present
+  $system_prop = "# MediaTek Helio G-Series VoLTE, ViLTE, VoWiFi & Telephony Fixes\n"
+    . "persist.vendor.radio.volte_state=1\n"
+    . "persist.vendor.volte_support=1\n"
+    . "persist.vendor.vilte_support=1\n"
+    . "persist.vendor.vowifi_support=1\n"
+    . "persist.vendor.viwifi_support=1\n"
+    . "persist.dbg.volte_avail_ovr=1\n"
+    . "persist.dbg.vt_avail_ovr=1\n"
+    . "persist.dbg.wfc_avail_ovr=1\n"
+    . "persist.vendor.mtk.volte.enable=1\n"
+    . "persist.vendor.radio.imsStkSupport=1\n"
+    . "persist.vendor.radio.mtk_dsbp_support=2\n"
+    . "persist.vendor.radio.smart.data.switch=1\n"
+    . "ro.telephony.default_network=9,9\n"
+    . "persist.radio.multisim.config=dsds\n";
+  $zip->addFromString('system.prop', $system_prop);
+  echo "    [+] Injected VoLTE/IMS & Telephony properties (system.prop)\n";
+
   if($patch_cert)
   {
     if($config['kernel'] === 'all' || $config['kernel'] === '*')
