@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  POX imei-fixer -- VINTF fragment.
+  Declares the MTK radio HALs some ROM builds forget to list in their device
+  manifest. Dropped to /vendor/etc/vintf/manifest/ (a location the framework
+  merges automatically), so this never *replaces* a stock manifest.
+-->
+<manifest version="2.0" type="device" target-level="3">
+    <hal format="hidl">
+        <name>vendor.mediatek.hardware.mtkradioex</name>
+        <transport>hwbinder</transport>
+        <version>2.0</version>
+        <interface>
+            <name>IMtkRadioEx</name>
+            <instance>slot1</instance>
+            <instance>slot2</instance>
+        </interface>
+    </hal>
+    <hal format="hidl">
+        <name>android.hardware.radio.config</name>
+        <transport>hwbinder</transport>
+        <version>1.2</version>
+        <interface>
+            <name>IRadioConfig</name>
+            <instance>default</instance>
+        </interface>
+    </hal>
+</manifest>

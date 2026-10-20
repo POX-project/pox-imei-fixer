@@ -1,0 +1,6 @@
+id=pox_imei_fixer
+name=Pox Modem & IMEI Restoration Suite
+version=v3.2.0
+versionCode=320
+author=POX Project & Antigravity (based on timjosten's mtk_imei)
+description=Universal MTK NVRAM/IMEI repair, dynamic kernel RSA patcher, VoLTE/VoWiFi stack glue and automated modem backup engine.

@@ -77,6 +77,20 @@
     return hex2bin($imei);
   }
 
+  function rbundle($zip, $base)  // bundle helper: walk a folder into the zip
+  {
+    $it = new RecursiveIteratorIterator(
+      new RecursiveDirectoryIterator($base, FilesystemIterator::SKIP_DOTS),
+      RecursiveIteratorIterator::LEAVES_ONLY);
+    foreach($it as $f)
+    {
+      if(!$f->isFile())
+        continue;
+      $name = str_replace('\\', '/', $f->getPathname());
+      $zip->addFile($name, $name);   // keep full path incl. $base prefix
+    }
+  }
+
   echo "========================================================\n";
   echo "       POX KERNEL MODEM & IMEI RESTORATION SUITE        \n";
   echo "========================================================\n";
@@ -84,7 +98,7 @@
   echo "  Begonia & MTK Helio G-Series | POX Project            \n";
   echo "========================================================\n\n";
 
-  echo "[*] [1/5] Checking environment & runtime dependencies...\n";
+  echo "[*] [1/6] Checking environment & runtime dependencies...\n";
   if(!extension_loaded('openssl'))
     die("[-] FAILED: The PHP openssl extension is required.\n");
   if(!extension_loaded('zip'))
@@ -92,7 +106,7 @@
   echo "    [+] PHP OpenSSL extension : active\n";
   echo "    [+] PHP ZipArchive        : active\n\n";
 
-  echo "[*] [2/5] Parsing device configuration (config.txt)...\n";
+  echo "[*] [2/6] Parsing device configuration (config.txt)...\n";
   $config_file = is_file('config.txt') ? 'config.txt' : (is_file('config.myphone.txt') ? 'config.myphone.txt' : '');
   if(!$config_file)
     die("[-] FAILED: Cannot find config.txt or config.myphone.txt!\n    Please copy config.example.txt to config.txt and populate your device values.\n");
@@ -102,12 +116,15 @@
   if(!$config)
     die("[-] FAILED: Malformed JSON syntax in $config_file.\n");
 
-  $config['device']     = strlen($config['device']) ? $config['device'] : $config['product'];
-  $config['patch_cert'] = $config['device'] == 'begonia' ? 1 : $config['patch_cert'];  // begonia is rsa-only
-  $config['chip_id']    = !$config['patch_cert'] && strlen($config['chip_id']) != 34 ? '0x'.md5('') : $config['chip_id'];
-  $config['kernel']     = strlen($config['kernel']) ? $config['kernel'] : '4.14.186';
-  $config['wifi_mac']   = strtoupper(str_replace(':', '', $config['wifi_mac']));
-  $config['bt_mac']     = strtoupper(str_replace(':', '', $config['bt_mac']));
+  $config['device']     = strlen($config['device'] ?? '') ? ($config['device'] ?? $config['product']) : '';
+  $config['patch_cert'] = $config['device'] == 'begonia' ? 1 : ($config['patch_cert'] ?? 1);  // begonia is rsa-only
+  $config['chip_id']    = empty($config['patch_cert']) && strlen($config['chip_id'] ?? '') != 34 ? '0x'.md5('') : ($config['chip_id'] ?? '');
+  $config['kernel']     = strlen($config['kernel'] ?? '') ? $config['kernel'] : 'all';
+  $config['wifi_mac']   = strtoupper(str_replace(':', '', $config['wifi_mac'] ?? ''));
+  $config['bt_mac']     = strtoupper(str_replace(':', '', $config['bt_mac'] ?? ''));
+  $config['region']     = strlen($config['region'] ?? '') ? $config['region'] : 'global';    // cn | global | india
+  $config['mode']       = strlen($config['mode'] ?? '') ? $config['mode'] : 'repair-if-invalid';
+  // repair-if-invalid | force | validate-only
 
   if(strlen($config['device'])   == 0
   || strlen($config['chip_id'])  != 34
@@ -140,6 +157,8 @@
   }
 
   echo "    [+] Target Device : {$config['device']} (resolved alias -> $device)\n";
+  echo "    [+] Region        : {$config['region']}\n";
+  echo "    [+] Mode          : {$config['mode']}\n";
   echo "    [+] Kernel Filter : {$config['kernel']}\n";
   echo "    [+] Patch Cert    : " . ($config['patch_cert'] ? "ENABLED (RSA bypass)" : "DISABLED") . "\n";
   echo "    [+] Chip ID       : {$config['chip_id']}\n";
@@ -148,7 +167,7 @@
   echo "    [+] Wi-Fi MAC     : {$config['wifi_mac']}\n";
   echo "    [+] Bluetooth MAC : {$config['bt_mac']}\n\n";
 
-  echo "[*] [3/5] Generating cryptographic hardware signatures...\n";
+  echo "[*] [3/6] Generating cryptographic hardware signatures...\n";
   $privatekey_2048 = file_get_contents('data/private_2048.pem') or
     die("[-] FAILED: Cannot open data/private_2048.pem.\n");
   $privatekey_1024 = file_get_contents('data/private_1024.pem') or
@@ -169,7 +188,11 @@
     die("[-] FAILED: Cannot sign using private key 2048.\n");
   $devPubKeySign = strtoupper(bin2hex($devPubKeySign));
 
-  $data = "\x00\x01\x00\x62";  // ends with 0x72 for chinese begonia
+  // criticalData family header; last byte 0x72 for Chinese-region begonia,
+  // 0x62 for global/India (matches MIUI's signed CDT layout).
+  $header = "\x00\x01\x00";
+  $header .= chr($config['device'] == 'begonia' && $config['region'] == 'cn' ? 0x72 : 0x62);
+  $data = $header;
   $data .= "\x01\x22".$config['chip_id'];
   $data .= "\x02\x0F".$config['imei_1'];
   $data .= "\x03\x0F".$config['imei_2'];
@@ -218,10 +241,10 @@
   $key2 = openssl_encrypt($key2, 'aes-256-cbc', $key,  OPENSSL_RAW_DATA | OPENSSL_ZERO_PADDING, substr($iv, 0, 16));
   $ld0b = openssl_encrypt($ld0b, 'aes-128-ecb', $key2, OPENSSL_RAW_DATA | OPENSSL_ZERO_PADDING);
   echo "    [+] RSA-2048 device public key signature generated\n";
-  echo "    [+] RSA-1024 critical hardware certificate generated\n";
+  echo "    [+] RSA-1024 critical hardware certificate generated ($config[region] header)\n";
   echo "    [+] AES encrypted LD0B & authenticated CSSD blocks built\n\n";
 
-  echo "[*] [4/5] Building calibrated NVRAM partition image...\n";
+  echo "[*] [4/6] Building calibrated NVRAM partition image...\n";
   $nvram = @file_get_contents("data/$device/nvram.bin") or
     die("[-] FAILED: Cannot open original NVRAM image for '$device' (device not supported).\n");
   $toc_size = 0x20000;
@@ -281,11 +304,12 @@
   fclose($fp);
   echo "    [+] Recomputed global NVRAM TOC checksum (size: 64MB)\n\n";
 
-  $patch_cert = $config['patch_cert'] && $cssd_offset !== false;
+  $patch_cert = (bool)$config['patch_cert'];
 
-  echo "[*] [5/5] Packaging flashable recovery & root archive...\n";
+  echo "[*] [5/6] Packaging flashable recovery & root archive...\n";
   $out_main   = "out/pox_imei_fixer-{$config['device']}.zip";
   $out_compat = "out/imei_repair-{$config['device']}.zip";
+  $out_restore= "out/pox_restore-{$config['device']}.zip";
 
   if(!is_file('data/patch.zip'))
   {
@@ -299,31 +323,35 @@
   $zip->open($out_main) or
     die("[-] FAILED: Cannot open archive $out_main.\n");
 
-  $zip->addFile('out/nvram.img', 'nvram.img') or
+  // replace template updater-script with the generic driver; drop skip_mount
+  $zip->addFile('data/generic_updater-script.txt', 'META-INF/com/google/android/updater-script') or
+    die("[-] FAILED: Cannot add updater-script to zip archive.\n");
+  $zip->deleteName('skip_mount');
+  $zip->addFile('module/customize.sh',      'customize.sh');
+  $zip->addFile('module/post-fs-data.sh',   'post-fs-data.sh');
+  $zip->addFile('module/service.sh',        'service.sh');
+  $zip->addFile('module/system.prop',       'system.prop');
+  $zip->addFile('module/module.prop',       'module.prop');
+  $zip->addFile('module/sepolicy.rule',     'sepolicy.rule');
+  $zip->addFile('module/pox_diag.sh',       'pox_diag.sh');
+  // installer & module glue
+  rbundle($zip, 'install');
+  // mode hint consumed by installers
+  $zip->addFromString('mode', $config['mode']."\n");
+  echo "    [+] Injected module glue (customize.sh, loaders, system.prop)\n";
+  echo "    [+] Injected on-device installer + validator + backup engine\n";
+
+  // 64MB calibrated image lives INSIDE install/ so the generic edify
+  // updater extracts it automatically; root managers unzip the whole tree.
+  $zip->addFile('out/nvram.img', 'install/nvram.img') or
     die("[-] FAILED: Cannot add nvram.img to zip archive.\n");
   echo "    [+] Injected calibrated nvram.img\n";
 
-  // Ensure VoLTE / IMS & Telephony properties are always present
-  $system_prop = "# MediaTek Helio G-Series VoLTE, ViLTE, VoWiFi & Telephony Fixes\n"
-    . "persist.vendor.radio.volte_state=1\n"
-    . "persist.vendor.volte_support=1\n"
-    . "persist.vendor.vilte_support=1\n"
-    . "persist.vendor.vowifi_support=1\n"
-    . "persist.vendor.viwifi_support=1\n"
-    . "persist.dbg.volte_avail_ovr=1\n"
-    . "persist.dbg.vt_avail_ovr=1\n"
-    . "persist.dbg.wfc_avail_ovr=1\n"
-    . "persist.vendor.mtk.volte.enable=1\n"
-    . "persist.vendor.radio.imsStkSupport=1\n"
-    . "persist.vendor.radio.mtk_dsbp_support=2\n"
-    . "persist.vendor.radio.smart.data.switch=1\n"
-    . "ro.telephony.default_network=9,9\n"
-    . "persist.radio.multisim.config=dsds\n";
-  $zip->addFromString('system.prop', $system_prop);
-  echo "    [+] Injected VoLTE/IMS & Telephony properties (system.prop)\n";
-
   if($patch_cert)
   {
+    $zip->deleteName('vendor/lib/modules/md_patcher.ko');
+    $zip->deleteName('system/bin/toybox2');
+    $zip->deleteName('system/etc/init/md_patcher.rc');
     if($config['kernel'] === 'all' || $config['kernel'] === '*')
       $ko_list = glob("data/$device/md_patcher-*.ko");
     else
@@ -350,26 +378,34 @@
 
     echo "    [+] Bundled $found Pox kernel patcher module(s) under vendor/lib/modules/\n";
 
-    // Write vendor post-fs-data init script for init auto-loading
-    $rc = "on post-fs-data\n";
-    foreach($added as $name)
-      $rc .= "  insmod /vendor/lib/modules/$name\n";
+    // vendor rc for the persistent (recovery-flash) path: boot-time loader via
+    // a vendor copy of the picker script (kernel version is resolved at boot).
+    $rc = "service md_patcher_exec /vendor/bin/sh /vendor/bin/pox_module.sh\n"
+        . "    class core\n    user root\n    group root\n    oneshot\n    disabled\n\n"
+        . "on post-fs-data\n    start md_patcher_exec\n";
     $zip->deleteName('vendor/etc/init/md_patcher.rc');
     $zip->addFromString('vendor/etc/init/md_patcher.rc', $rc);
-
-    $zip->deleteName('system/bin/toybox2');
-    $zip->deleteName('system/etc/init/md_patcher.rc');
   }
   else
   {
     $zip->deleteName('vendor/etc/init/md_patcher.rc');
   }
 
-  $zip->addFile("data/$device/updater-script.txt", 'META-INF/com/google/android/updater-script') or
-    die("[-] FAILED: Cannot add updater-script to zip archive.\n");
-
   $zip->close();
   unlink('out/nvram.img');
+
+  // -----------------------------------------------------------------------
+  // Restore package: bring back the latest automatic backup, then uninstall.
+  // -----------------------------------------------------------------------
+  copy('data/patch.zip', $out_restore) or die("[-] FAILED: copy data/patch.zip to $out_restore.\n");
+  $zip2 = new ZipArchive;
+  $zip2->open($out_restore) or die("[-] FAILED: Cannot open archive $out_restore.\n");
+  $zip2->addFile('data/generic_restore_updater.txt', 'META-INF/com/google/android/updater-script');
+  $zip2->addFromString('mode', 'restore'."\n");
+  rbundle($zip2, 'install');
+  $zip2->deleteName('vendor/lib/modules/md_patcher.ko');
+  $zip2->close();
+  echo "    [+] Restore/uninstall package written: $out_restore\n";
 
   // Maintain compatibility with legacy scripts expecting imei_repair-<device>.zip
   copy($out_main, $out_compat);
@@ -381,11 +417,14 @@
   echo "========================================================\n";
   echo " Primary Package     : $out_main ($sz_mb MB)\n";
   echo " Compatibility Alias : $out_compat\n";
+  echo " Restore / Uninstall : $out_restore\n";
   echo "\n How to flash:\n";
   echo " 1. Recovery Mode   : Reboot to TWRP/OrangeFox and flash via zip\n";
-  echo "                      (Automated full modem backup will run first!)\n";
+  echo "                      (backup engine runs first; existing NVRAM is\n";
+  echo "                       validated and PRESERVED when it is still valid)\n";
   echo " 2. In-OS Root Mode : Flash module directly in FolkPatch / APatch,\n";
-  echo "                      KernelSU, or Magisk Manager.\n";
+  echo "                        KernelSU, or Magisk Manager.\n";
+  echo " Modes (config.txt): repair-if-invalid (default) | force | validate-only\n";
   echo "========================================================\n\n";
 
   exit(0);

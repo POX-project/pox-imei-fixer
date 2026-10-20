@@ -1,0 +1,12 @@
+# POX imei-fixer -- generic recovery updater-script.
+# Works for all supported devices; the payload is driven entirely by
+# install/bin/install.sh (ports are device-agnostic now).
+ui_print("Pox Modem & IMEI Restoration Suite");
+package_extract_dir("install", "/tmp/install");
+set_metadata_recursive("/tmp/install", "uid", 0, "gid", 0, "dmode", 0755, "fmode", 0755);
+ui_print("POX backup/validate/repair driver...");
+run_program("/system/bin/sh", "/tmp/install/bin/install.sh") ||
+  run_program("/sbin/sh", "/tmp/install/bin/install.sh") ||
+  abort("POX install.sh failed -- check /data/local/tmp/pox_imei_fixer.log");
+ui_print("POX: done");
+set_progress(1.000000);

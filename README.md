@@ -103,17 +103,39 @@ The generated package will be placed in the `out/` folder:
 ### Option A: Flash in Recovery (TWRP / OrangeFox)
 1. Boot into Recovery.
 2. Tap **Install** -> Select the generated `.zip` -> **Swipe to Flash** (or `adb sideload <zip>`).
-3. The installer will:
-   - Create an automated full backup of all modem partitions in `/sdcard/Pox_Backups/`.
-   - Write the calibrated `nvram` and `nvdata` block partitions.
-   - Stage the Pox `md_patcher` module into `/data/adb/modules/pox_imei_fixer`.
+3. The generic edify driver (`data/generic_updater-script.txt`) hands over to `install/bin/install.sh`, which will:
+   - **Back up** all modem partition(s) to `/sdcard/Pox_Backups/` with SHA-256 manifest.
+   - **Validate** the existing NVRAM (`install/bin/nvram_check.sh`, shell port of the tool's `check_nvram.php`).
+   - **Write** the calibrated NVRAM *only if the existing chain is invalid* (see `mode` in config), then rebuild `nvdata`.
+   - **Stage** the kernel-aware `md_patcher` loader (`vendor/bin/pox_module.sh` + `vendor/etc/init/md_patcher.rc`) and every bundled `.ko` into `/vendor`, plus the VoLTE/VoWiFi prop block into `/vendor/build.prop`, so it survives ROM flashes.
+   - **Read-back verify** the TOC+CSSD region after flashing.
 4. Reboot to System.
 
 ### Option B: Flash via Root Manager App (In-OS)
 1. Open **FolkPatch**, **APatch**, **KernelSU**, or **Magisk** Manager.
 2. Go to **Modules** -> **Install from Storage** -> Select the `.zip`.
-3. The built-in `customize.sh` script will back up partitions, write `nvram`/`nvdata`, set permissions, and purge temporary images to save storage.
+3. The built-in `customize.sh` backs up partitions, validates, writes when warranted, sets `/mnt/vendor/nvdata` perms (`1000:1000`, `0771`) and purges the temporary images; the `md_patcher-<kernel>.ko` is selected at every boot via `install/bin/pick_module.sh` (`uname -r` match -> root-manager flavour -> base version -> classic fallback).
 4. Reboot your phone.
+
+### Restore / uninstall
+A companion package `out/pox_restore-<device>.zip` restores the newest
+`/sdcard/Pox_Backups/Modem_*` snapshot and removes the POX vendor/module bits.
+
+### Verify the build before flashing (recommended)
+```bash
+php bin/mtk_imei.php
+php bin/nvram_selftest.php out/pox_imei_fixer-<device>.zip config.txt
+# expect: == 17 passed, 0 failed ==
+```
+
+### Diagnose a running phone
+```bash
+adb shell sh /data/adb/modules/pox_imei_fixer/pox_diag.sh
+adb shell sh /data/adb/modules/pox_imei_fixer/install/bin/stack_report.sh
+```
+`stack_report` prints per-file which VoLTE/VoWiFi pieces the ROM carries; see
+`docs/ARCHITECTURE.md` for interpretation and `docs/ADDING-DEVICES.md` for
+porting to new devices.
 
 ---
 
@@ -140,12 +162,15 @@ dd if=/sdcard/Pox_Backups/Modem_<TIMESTAMP>/nvdata.img of=/dev/block/by-name/nvd
 
 ---
 
-## VoLTE & Telephony Support (v3.1.0+)
+## VoLTE & Telephony Support (v3.2.0+)
 
-Modern custom ROMs (AOSP, Lineage, Axion, Android 13/14/15/16) and pure LTE networks (such as Airtel or Jio) require explicit VoLTE and IMS configuration. Version 3.1.0+ includes:
-- **Automatic VoLTE/IMS Property Injection (`system.prop`)**: Forces `persist.vendor.volte_support=1`, `persist.vendor.radio.volte_state=1`, and `persist.vendor.mtk.volte.enable=1` to prevent Telecom from unregistering the PhoneAccount.
-- **SELinux Context Restoration**: Applies `u:object_r:vendor_file:s0` to kernel modules and `u:object_r:system_file:s0` to helper binaries, avoiding AVC denials under SELinux Enforcing mode.
-- **Runtime NVDATA Permissions**: Automatically sets `/mnt/vendor/nvdata` ownership (`1000:1000`) and mode (`0771`) to ensure `nvram_daemon` operates without permissions errors.
+Modern custom ROMs (AOSP, Lineage, Axion, Android 13/14/15/16) and pure LTE networks (such as Airtel or Jio) require explicit VoLTE and IMS configuration. Version 3.2.0+ includes:
+- **Expanded VoLTE/VoWiFi property injection** (`module/system.prop` + recovery `/vendor/build.prop` append): the full set observed in the working reference ROM - `persist.dbg.{ims_volte_enable,volte_avail_ovr,vt_avail_ovr,wfc_avail_ovr}`, iwlan feature props (`persist.data.iwlan*`, `ro.telephony.iwlan_operation_mode`), IMS/MAL enable flags, `telephony.active_modems.max_count`, `ro.vendor.md_auto_setup_ims`, `ro.vendor.mtk_ril_mode`.
+- **Kernel-aware module loading** with `install/bin/pick_module.sh` (replaces the hardcoded single-`.ko` insmod).
+- **SELinux Context Restoration**: Applies `u:object_r:vendor_file:s0` to staged modules, avoiding AVC denials under SELinux Enforcing mode.
+- **Runtime NVDATA Permissions**: Automatically sets `/mnt/vendor/nvdata` ownership (`1000:1000`) and mode (`0771`).
+- **Validate-before-overwrite**: existing signed NVRAM chains are preserved; the calibrated image is only written when the local chain fails validation (or when `mode=force`).
+- **VINTF fragment**: when the ROM manifest lacks the MTK radio HALs, `install/etc/vintf_pox_radio_fragment.xml` is dropped to `/vendor/etc/vintf/manifest/` (recovery path only).
 
 ---
 

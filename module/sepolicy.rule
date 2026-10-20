@@ -1,0 +1,16 @@
+# ---------------------------------------------------------------------------
+# POX imei-fixer -- SELinux allowances (Magisk / KernelSU / APatch format)
+# ---------------------------------------------------------------------------
+# allow root-manager domains to manage kernel modules + devices for the
+# modem patcher path
+allow magisk self:capability sys_module
+allow magisk kernel:system module_request
+allow magisk mddevice:chr_file rw_file_perms
+allow magisk sysfs_sarlevel:file rw_file_perms
+allow ksu self:capability sys_module
+allow ksu kernel:system module_request
+allow apatch self:capability sys_module
+allow apatch kernel:system module_request
+# vendor radio daemons already run in their own vendor domains on stock
+# vendors; the rules above only cover what this module itself needs.; we only
+# add what our own module needs.

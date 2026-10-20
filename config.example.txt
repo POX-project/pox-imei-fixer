@@ -2,6 +2,8 @@
   "patch_cert": 1,
   "kernel":   "all",
   "device":   "begonia",
+  "region":   "global",
+  "mode":     "repair-if-invalid",
   "chip_id":  "0x00000000000000000000000000000000",
   "imei_1":   "860000000000001",
   "imei_2":   "860000000000002",

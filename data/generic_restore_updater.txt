@@ -1,0 +1,11 @@
+# POX imei-fixer -- recovery-script for the RESTORE package.
+# Restores the automatically-saved modem-partition backup found under
+# /sdcard/Pox_Backups/Modem_<latest>/ and then removes POX module artefacts.
+ui_print("Pox Restore \u0026 Uninstall Suite");
+package_extract_dir("install", "/tmp/install");
+set_metadata_recursive("/tmp/install", "uid", 0, "gid", 0, "dmode", 0755, "fmode", 0755);
+run_program("/system/bin/sh", "/tmp/install/bin/restore.sh", "", "--uninstall") ||
+  run_program("/sbin/sh", "/tmp/install/bin/restore.sh", "", "--uninstall") ||
+  abort("POX restore.sh failed -- see /data/local/tmp/pox_imei_fixer.log");
+ui_print("POX restore: done");
+set_progress(1.000000);
